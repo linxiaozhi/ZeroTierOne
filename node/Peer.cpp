@@ -119,6 +119,7 @@ void Peer::received(
 					}
 					// If same address on same interface then don't learn unless existing path isn't alive (prevents learning loop)
 					if (_paths[i].p->address().ipsEqual(path->address()) && _paths[i].p->localSocket() == path->localSocket()) {
+						Mutex::Lock _l2(_bond_m);
 						if (_paths[i].p->alive(now) && !_bond) {
 							havePath = true;
 							break;
@@ -658,6 +659,7 @@ void Peer::resetWithinScope(void *tPtr,InetAddress::IpScope scope,int inetAddres
 void Peer::recordOutgoingPacket(const SharedPtr<Path> &path, const uint64_t packetId,
 	uint16_t payloadLength, const Packet::Verb verb, const int32_t flowId, int64_t now)
 {
+	Mutex::Lock l(_bond_m);
 	_outgoing_packet++;
 	if (_localMultipathSupported && _bond) {
 		_bond->recordOutgoingPacket(path, packetId, payloadLength, verb, flowId, now);
@@ -666,6 +668,7 @@ void Peer::recordOutgoingPacket(const SharedPtr<Path> &path, const uint64_t pack
 
 void Peer::recordIncomingInvalidPacket(const SharedPtr<Path>& path)
 {
+	Mutex::Lock l(_bond_m);
 	_packet_errors++;
 	if (_localMultipathSupported && _bond) {
 		_bond->recordIncomingInvalidPacket(path);
@@ -675,6 +678,7 @@ void Peer::recordIncomingInvalidPacket(const SharedPtr<Path>& path)
 void Peer::recordIncomingPacket(const SharedPtr<Path> &path, const uint64_t packetId,
 	uint16_t payloadLength, const Packet::Verb verb, const int32_t flowId, int64_t now)
 {
+	Mutex::Lock l(_bond_m);
 	if (_localMultipathSupported && _bond) {
 		_bond->recordIncomingPacket(path, packetId, payloadLength, verb, flowId, now);
 	}
