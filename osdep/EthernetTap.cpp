@@ -105,6 +105,7 @@ std::shared_ptr<EthernetTap> EthernetTap::newInstance(
 	static Mutex _comInit_m;
 
 	{
+		EXCLUDES(xxx)
 		Mutex::Lock l(_comInit_m);
 		if (!_comInit) {
 			hres = CoInitializeSecurity(

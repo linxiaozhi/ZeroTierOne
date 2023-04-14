@@ -13,7 +13,7 @@ extern "C" {
  * Signature: (JLcom/zerotier/sdk/DataStoreGetListener;Lcom/zerotier/sdk/DataStorePutListener;Lcom/zerotier/sdk/PacketSender;Lcom/zerotier/sdk/EventListener;Lcom/zerotier/sdk/VirtualNetworkFrameListener;Lcom/zerotier/sdk/VirtualNetworkConfigListener;Lcom/zerotier/sdk/PathChecker;)Lcom/zerotier/sdk/ResultCode;
  */
 JNIEXPORT jobject JNICALL Java_com_zerotier_sdk_Node_node_1init
-  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jobject, jobject, jobject, jobject);
+  (JNIEnv *, jobject, jlong, jobject, jobject, jobject, jobject, jobject, jobject, jobject); //REQUIRES(!nodeMapMutex);
 
 /*
  * Class:     com_zerotier_sdk_Node
@@ -21,7 +21,7 @@ JNIEXPORT jobject JNICALL Java_com_zerotier_sdk_Node_node_1init
  * Signature: (J)Z;
  */
 JNIEXPORT jboolean JNICALL Java_com_zerotier_sdk_Node_node_1isInited
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jobject, jlong); //REQUIRES(!nodeMapMutex);
 
 /*
  * Class:     com_zerotier_sdk_Node
@@ -29,7 +29,7 @@ JNIEXPORT jboolean JNICALL Java_com_zerotier_sdk_Node_node_1isInited
  * Signature: (J)V
  */
 JNIEXPORT void JNICALL Java_com_zerotier_sdk_Node_node_1delete
-  (JNIEnv *, jobject, jlong);
+  (JNIEnv *, jobject, jlong); // REQUIRES(!nodeMapMutex);
 
 /*
  * Class:     com_zerotier_sdk_Node

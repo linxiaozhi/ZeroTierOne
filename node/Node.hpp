@@ -54,7 +54,7 @@ class Node : public NetworkController::Sender
 {
 public:
 	Node(void *uptr,void *tptr,const struct ZT_Node_Callbacks *callbacks,int64_t now);
-	virtual ~Node();
+	virtual ~Node() REQUIRES(!_networks_m);
 
 	// Get rid of alignment warnings on 32-bit Windows and possibly improve performance
 #ifdef __WINDOWS__
@@ -82,22 +82,22 @@ public:
 		unsigned int vlanId,
 		const void *frameData,
 		unsigned int frameLength,
-		volatile int64_t *nextBackgroundTaskDeadline);
-	ZT_ResultCode processBackgroundTasks(void *tptr,int64_t now,volatile int64_t *nextBackgroundTaskDeadline);
-	ZT_ResultCode join(uint64_t nwid,void *uptr,void *tptr);
-	ZT_ResultCode leave(uint64_t nwid,void **uptr,void *tptr);
-	ZT_ResultCode multicastSubscribe(void *tptr,uint64_t nwid,uint64_t multicastGroup,unsigned long multicastAdi);
-	ZT_ResultCode multicastUnsubscribe(uint64_t nwid,uint64_t multicastGroup,unsigned long multicastAdi);
+		volatile int64_t *nextBackgroundTaskDeadline) REQUIRES(!_networks_m);
+	ZT_ResultCode processBackgroundTasks(void *tptr,int64_t now,volatile int64_t *nextBackgroundTaskDeadline) REQUIRES(!_backgroundTasksLock) REQUIRES(!_networks_m) REQUIRES(!_localControllerAuthorizations_m);
+	ZT_ResultCode join(uint64_t nwid,void *uptr,void *tptr) REQUIRES(!_networks_m);
+	ZT_ResultCode leave(uint64_t nwid,void **uptr,void *tptr) REQUIRES(!_networks_m);
+	ZT_ResultCode multicastSubscribe(void *tptr,uint64_t nwid,uint64_t multicastGroup,unsigned long multicastAdi) REQUIRES(!_networks_m);
+	ZT_ResultCode multicastUnsubscribe(uint64_t nwid,uint64_t multicastGroup,unsigned long multicastAdi) REQUIRES(!_networks_m);
 	ZT_ResultCode orbit(void *tptr,uint64_t moonWorldId,uint64_t moonSeed);
 	ZT_ResultCode deorbit(void *tptr,uint64_t moonWorldId);
 	uint64_t address() const;
 	void status(ZT_NodeStatus *status) const;
 	ZT_PeerList *peers() const;
-	ZT_VirtualNetworkConfig *networkConfig(uint64_t nwid) const;
-	ZT_VirtualNetworkList *networks() const;
+	ZT_VirtualNetworkConfig *networkConfig(uint64_t nwid) const REQUIRES(!_networks_m);
+	ZT_VirtualNetworkList *networks() const REQUIRES(!_networks_m);
 	void freeQueryResult(void *qr);
-	int addLocalInterfaceAddress(const struct sockaddr_storage *addr);
-	void clearLocalInterfaceAddresses();
+	int addLocalInterfaceAddress(const struct sockaddr_storage *addr) REQUIRES(!_directPaths_m);
+	void clearLocalInterfaceAddresses() REQUIRES(!_directPaths_m);
 	int sendUserMessage(void *tptr,uint64_t dest,uint64_t typeId,const void *data,unsigned int len);
 	void setNetconfMaster(void *networkControllerInstance);
 
@@ -134,7 +134,7 @@ public:
 			len);
 	}
 
-	inline SharedPtr<Network> network(uint64_t nwid) const
+	inline SharedPtr<Network> network(uint64_t nwid) const REQUIRES(!_networks_m)
 	{
 		Mutex::Lock _l(_networks_m);
 		const SharedPtr<Network> *n = _networks.get(nwid);
@@ -144,13 +144,13 @@ public:
 		return SharedPtr<Network>();
 	}
 
-	inline bool belongsToNetwork(uint64_t nwid) const
+	inline bool belongsToNetwork(uint64_t nwid) const REQUIRES(!_networks_m)
 	{
 		Mutex::Lock _l(_networks_m);
 		return _networks.contains(nwid);
 	}
 
-	inline std::vector< SharedPtr<Network> > allNetworks() const
+	inline std::vector< SharedPtr<Network> > allNetworks() const REQUIRES(!_networks_m)
 	{
 		std::vector< SharedPtr<Network> > nw;
 		Mutex::Lock _l(_networks_m);
@@ -163,7 +163,7 @@ public:
 		return nw;
 	}
 
-	inline std::vector<InetAddress> directPaths() const
+	inline std::vector<InetAddress> directPaths() const REQUIRES(!_directPaths_m)
 	{
 		Mutex::Lock _l(_directPaths_m);
 		return _directPaths;
@@ -179,7 +179,7 @@ public:
 	inline void stateObjectPut(void *const tPtr,ZT_StateObjectType type,const uint64_t id[2],const void *const data,const unsigned int len) { _cb.statePutFunction(reinterpret_cast<ZT_Node *>(this),_uPtr,tPtr,type,id,data,(int)len); }
 	inline void stateObjectDelete(void *const tPtr,ZT_StateObjectType type,const uint64_t id[2]) { _cb.statePutFunction(reinterpret_cast<ZT_Node *>(this),_uPtr,tPtr,type,id,(const void *)0,-1); }
 
-	bool shouldUsePathForZeroTierTraffic(void *tPtr,const Address &ztaddr,const int64_t localSocket,const InetAddress &remoteAddress);
+	bool shouldUsePathForZeroTierTraffic(void *tPtr,const Address &ztaddr,const int64_t localSocket,const InetAddress &remoteAddress) REQUIRES(!_networks_m);
 	inline bool externalPathLookup(void *tPtr,const Address &ztaddr,int family,InetAddress &addr) { return ( (_cb.pathLookupFunction) ? (_cb.pathLookupFunction(reinterpret_cast<ZT_Node *>(this),_uPtr,tPtr,ztaddr.toInt(),family,reinterpret_cast<struct sockaddr_storage *>(&addr)) != 0) : false ); }
 
 	uint64_t prng();
@@ -249,14 +249,14 @@ public:
 		return false;
 	}
 
-	virtual void ncSendConfig(uint64_t nwid,uint64_t requestPacketId,const Address &destination,const NetworkConfig &nc,bool sendLegacyFormatConfig);
-	virtual void ncSendRevocation(const Address &destination,const Revocation &rev);
-	virtual void ncSendError(uint64_t nwid,uint64_t requestPacketId,const Address &destination,NetworkController::ErrorCode errorCode, const void *errorData, unsigned int errorDataSize);
+	virtual void ncSendConfig(uint64_t nwid,uint64_t requestPacketId,const Address &destination,const NetworkConfig &nc,bool sendLegacyFormatConfig) REQUIRES(!_localControllerAuthorizations_m) REQUIRES(!_networks_m);
+	virtual void ncSendRevocation(const Address &destination,const Revocation &rev) REQUIRES(!_networks_m);
+	virtual void ncSendError(uint64_t nwid,uint64_t requestPacketId,const Address &destination,NetworkController::ErrorCode errorCode, const void *errorData, unsigned int errorDataSize) REQUIRES(!_networks_m);
 
 	inline const Address &remoteTraceTarget() const { return _remoteTraceTarget; }
 	inline Trace::Level remoteTraceLevel() const { return _remoteTraceLevel; }
 
-	inline bool localControllerHasAuthorized(const int64_t now,const uint64_t nwid,const Address &addr) const
+	inline bool localControllerHasAuthorized(const int64_t now,const uint64_t nwid,const Address &addr) const REQUIRES(!_localControllerAuthorizations_m)
 	{
 		_localControllerAuthorizations_m.lock();
 		const int64_t *const at = _localControllerAuthorizations.get(_LocalControllerAuth(nwid,addr));
@@ -309,13 +309,13 @@ private:
 		inline bool operator==(const _LocalControllerAuth &a) const { return ((a.nwid == nwid)&&(a.address == address)); }
 		inline bool operator!=(const _LocalControllerAuth &a) const { return ((a.nwid != nwid)||(a.address != address)); }
 	};
-	Hashtable< _LocalControllerAuth,int64_t > _localControllerAuthorizations;
+	Hashtable< _LocalControllerAuth,int64_t > _localControllerAuthorizations GUARDED_BY(_localControllerAuthorizations_m);
 	Mutex _localControllerAuthorizations_m;
 
-	Hashtable< uint64_t,SharedPtr<Network> > _networks;
+	Hashtable< uint64_t,SharedPtr<Network> > _networks GUARDED_BY(_networks_m);
 	Mutex _networks_m;
 
-	std::vector<InetAddress> _directPaths;
+	std::vector<InetAddress> _directPaths GUARDED_BY(_directPaths_m);
 	Mutex _directPaths_m;
 
 	Mutex _backgroundTasksLock;

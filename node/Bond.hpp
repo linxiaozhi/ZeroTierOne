@@ -21,6 +21,8 @@
 #include "RuntimeEnvironment.hpp"
 #include "Trace.hpp"
 
+#include "b_mutex.h"
+
 #include <cstdarg>
 #include <deque>
 #include <list>
@@ -342,7 +344,7 @@ class Bond {
 	/**
 	 * @return Whether the bonding layer is currently set up to be used.
 	 */
-	static bool inUse()
+	static bool inUse() REQUIRES(!_bonds_m)
 	{
 		return ! _bondPolicyTemplates.empty() || _defaultPolicy;
 	}
@@ -429,7 +431,7 @@ class Bond {
 	 * @param policyAlias User-defined custom name for variant of bonding policy
 	 * @param link Pointer to new link definition
 	 */
-	static void addCustomLink(std::string& policyAlias, SharedPtr<Link> link);
+	static void addCustomLink(std::string& policyAlias, SharedPtr<Link> link) REQUIRES(!_links_m);
 
 	/**
 	 * Add a user-defined bonding policy that is based on one of the standard types.
@@ -437,7 +439,7 @@ class Bond {
 	 * @param newBond Pointer to custom Bond object
 	 * @return Whether a uniquely-named custom policy was successfully added
 	 */
-	static bool addCustomPolicy(const SharedPtr<Bond>& newBond);
+	static bool addCustomPolicy(const SharedPtr<Bond>& newBond) REQUIRES(!_bonds_m);
 
 	/**
 	 * Assigns a specific bonding policy
@@ -446,7 +448,7 @@ class Bond {
 	 * @param policyAlias
 	 * @return
 	 */
-	static bool assignBondingPolicyToPeer(int64_t identity, const std::string& policyAlias);
+	static bool assignBondingPolicyToPeer(int64_t identity, const std::string& policyAlias) REQUIRES(!_bonds_m);
 
 	/**
 	 * Get pointer to bond by a given peer ID
@@ -454,7 +456,7 @@ class Bond {
 	 * @param peer Remote peer ID
 	 * @return A pointer to the Bond
 	 */
-	static SharedPtr<Bond> getBondByPeerId(int64_t identity);
+	static SharedPtr<Bond> getBondByPeerId(int64_t identity) REQUIRES(!_bonds_m);
 
 	/**
 	 * Add a new bond to the bond controller.
@@ -463,14 +465,14 @@ class Bond {
 	 * @param peer Remote peer that this bond services
 	 * @return A pointer to the newly created Bond
 	 */
-	static SharedPtr<Bond> createBond(const RuntimeEnvironment* renv, const SharedPtr<Peer>& peer);
+	static SharedPtr<Bond> createBond(const RuntimeEnvironment* renv, const SharedPtr<Peer>& peer) REQUIRES(!_bonds_m);
 
 	/**
 	 * Remove a bond from the bond controller.
 	 *
 	 * @param peerId Remote peer that this bond services
 	 */
-	static void destroyBond(uint64_t peerId);
+	static void destroyBond(uint64_t peerId) REQUIRES(!_bonds_m);
 
 	/**
 	 * Periodically perform maintenance tasks for the bonding layer.
@@ -478,7 +480,7 @@ class Bond {
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param now Current time
 	 */
-	static void processBackgroundTasks(void* tPtr, int64_t now);
+	static void processBackgroundTasks(void* tPtr, int64_t now) REQUIRES(!_bonds_m) REQUIRES(!_flows_m);
 
 	/**
 	 * Gets a reference to a physical link definition given a policy alias and a local socket.
@@ -488,7 +490,7 @@ class Bond {
 	 * @param createIfNeeded Whether a Link object is created if the name wasn't previously in the link map
 	 * @return Physical link definition
 	 */
-	SharedPtr<Link> getLinkBySocket(const std::string& policyAlias, uint64_t localSocket, bool createIfNeeded);
+	SharedPtr<Link> getLinkBySocket(const std::string& policyAlias, uint64_t localSocket, bool createIfNeeded) REQUIRES(!_links_m);
 
 	/**
 	 * Gets a reference to a physical link definition given its human-readable system name.
@@ -497,7 +499,7 @@ class Bond {
 	 * @param ifname Alphanumeric human-readable name
 	 * @return Physical link definition
 	 */
-	static SharedPtr<Link> getLinkByName(const std::string& policyAlias, const std::string& ifname);
+	static SharedPtr<Link> getLinkByName(const std::string& policyAlias, const std::string& ifname) REQUIRES(!_links_m);
 
   private:
 	static Phy<Bond*>* _phy;
@@ -523,17 +525,17 @@ class Bond {
 	/**
 	 * All currently active bonds.
 	 */
-	static std::map<int64_t, SharedPtr<Bond> > _bonds;
+	static std::map<int64_t, SharedPtr<Bond> > _bonds GUARDED_BY(_bonds_m);
 
 	/**
 	 * Map of peers to custom bonding policies
 	 */
-	static std::map<int64_t, std::string> _policyTemplateAssignments;
+	static std::map<int64_t, std::string> _policyTemplateAssignments GUARDED_BY(_bonds_m);
 
 	/**
 	 * User-defined bonding policies (can be assigned to a peer)
 	 */
-	static std::map<std::string, SharedPtr<Bond> > _bondPolicyTemplates;
+	static std::map<std::string, SharedPtr<Bond> > _bondPolicyTemplates GUARDED_BY(_bonds_m);
 
 	/**
 	 * Set of links defined for a given bonding policy
@@ -616,7 +618,7 @@ class Bond {
 	 * @param path Newly-learned Path which should now be handled by the Bond
 	 * @param now Current time
 	 */
-	void nominatePathToBond(const SharedPtr<Path>& path, int64_t now);
+	void nominatePathToBond(const SharedPtr<Path>& path, int64_t now) REQUIRES(!_paths_m);
 
 	/**
 	 * Add a nominated path to the bond. This merely maps the index from the nominated set
@@ -625,7 +627,7 @@ class Bond {
 	 * @param nominatedIdx The index in the nominated set
 	 * @param bondedIdx The index in the bonded set (subset of nominated)
 	 */
-	void addPathToBond(int nominatedIdx, int bondedIdx);
+	void addPathToBond(int nominatedIdx, int bondedIdx) REQUIRES(_paths_m);
 
 	/**
 	 * Check path states and perform bond rebuilds if needed.
@@ -633,14 +635,14 @@ class Bond {
 	 * @param now Current time
 	 * @param rebuild Whether or not the bond should be reconstructed.
 	 */
-	void curateBond(int64_t now, bool rebuild);
+	void curateBond(int64_t now, bool rebuild) REQUIRES(_paths_m);
 
 	/**
 	 * Periodically perform statistical summaries of quality metrics for all paths.
 	 *
 	 * @param now Current time
 	 */
-	void estimatePathQuality(int64_t now);
+	void estimatePathQuality(int64_t now) REQUIRES(_paths_m);
 
 	/**
 	 * Record an invalid incoming packet. This packet failed
@@ -649,7 +651,7 @@ class Bond {
 	 *
 	 * @param path Path over which packet was received
 	 */
-	void recordIncomingInvalidPacket(const SharedPtr<Path>& path);
+	void recordIncomingInvalidPacket(const SharedPtr<Path>& path) REQUIRES(!_paths_m);
 
 	/**
 	 * Record statistics on outbound an packet.
@@ -661,7 +663,7 @@ class Bond {
 	 * @param flowId Flow ID
 	 * @param now Current time
 	 */
-	void recordOutgoingPacket(const SharedPtr<Path>& path, uint64_t packetId, uint16_t payloadLength, Packet::Verb verb, int32_t flowId, int64_t now);
+	void recordOutgoingPacket(const SharedPtr<Path>& path, uint64_t packetId, uint16_t payloadLength, Packet::Verb verb, int32_t flowId, int64_t now) REQUIRES(!_flows_m) REQUIRES(!_paths_m);
 
 	/**
 	 * Process the contents of an inbound VERB_QOS_MEASUREMENT to gather path quality observations.
@@ -671,7 +673,7 @@ class Bond {
 	 * @param rx_id table of packet IDs
 	 * @param rx_ts table of holding times
 	 */
-	void receivedQoS(const SharedPtr<Path>& path, int64_t now, int count, uint64_t* rx_id, uint16_t* rx_ts);
+	void receivedQoS(const SharedPtr<Path>& path, int64_t now, int count, uint64_t* rx_id, uint16_t* rx_ts) REQUIRES(!_paths_m);
 
 	/**
 	 * Process the contents of an inbound VERB_ACK to gather path quality observations.
@@ -689,7 +691,7 @@ class Bond {
 	 * @param qosBuffer destination buffer
 	 * @return Size of payload
 	 */
-	int32_t generateQoSPacket(int pathIdx, int64_t now, char* qosBuffer);
+	int32_t generateQoSPacket(int pathIdx, int64_t now, char* qosBuffer) REQUIRES(_paths_m);
 
 	/**
 	 * Record statistics for an inbound packet.
@@ -701,7 +703,7 @@ class Bond {
 	 * @param flowId Flow ID
 	 * @param now Current time
 	 */
-	void recordIncomingPacket(const SharedPtr<Path>& path, uint64_t packetId, uint16_t payloadLength, Packet::Verb verb, int32_t flowId, int64_t now);
+	void recordIncomingPacket(const SharedPtr<Path>& path, uint64_t packetId, uint16_t payloadLength, Packet::Verb verb, int32_t flowId, int64_t now) REQUIRES(!_paths_m) REQUIRES(!_flows_m);
 
 	/**
 	 * Determines the most appropriate path for packet and flow egress. This decision is made by
@@ -711,7 +713,7 @@ class Bond {
 	 * @param flowId Flow ID
 	 * @return Pointer to suggested Path
 	 */
-	SharedPtr<Path> getAppropriatePath(int64_t now, int32_t flowId);
+	SharedPtr<Path> getAppropriatePath(int64_t now, int32_t flowId) REQUIRES(!_flows_m) REQUIRES(!_paths_m);
 
 	/**
 	 * Creates a new flow record
@@ -722,7 +724,7 @@ class Bond {
 	 * @param now Current time
 	 * @return Pointer to newly-created Flow
 	 */
-	SharedPtr<Flow> createFlow(int pathIdx, int32_t flowId, unsigned char entropy, int64_t now);
+	SharedPtr<Flow> createFlow(int pathIdx, int32_t flowId, unsigned char entropy, int64_t now) REQUIRES(_paths_m) REQUIRES(_flows_m);
 
 	/**
 	 * Removes flow records that are past a certain age limit.
@@ -731,7 +733,7 @@ class Bond {
 	 * @param oldest Whether only the oldest shall be forgotten
 	 * @param now Current time
 	 */
-	void forgetFlowsWhenNecessary(uint64_t age, bool oldest, int64_t now);
+	void forgetFlowsWhenNecessary(uint64_t age, bool oldest, int64_t now) REQUIRES(_paths_m) REQUIRES(_flows_m);
 
 	/**
 	 * Assigns a new flow to a bonded path
@@ -740,7 +742,7 @@ class Bond {
 	 * @param now Current time
 	 * @param reassign Whether this flow is being re-assigned to another path
 	 */
-	bool assignFlowToBondedPath(SharedPtr<Flow>& flow, int64_t now, bool reassign);
+	bool assignFlowToBondedPath(SharedPtr<Flow>& flow, int64_t now, bool reassign) REQUIRES(_paths_m) REQUIRES(_flows_m);
 
 	/**
 	 * Determine whether a path change should occur given the remote peer's reported utility and our
@@ -751,7 +753,7 @@ class Bond {
 	 * @param path Path over which the negotiation request was received
 	 * @param remoteUtility How much utility the remote peer claims to gain by using the declared path
 	 */
-	void processIncomingPathNegotiationRequest(uint64_t now, SharedPtr<Path>& path, int16_t remoteUtility);
+	void processIncomingPathNegotiationRequest(uint64_t now, SharedPtr<Path>& path, int16_t remoteUtility) REQUIRES(!_paths_m);
 
 	/**
 	 * Determine state of path synchronization and whether a negotiation request
@@ -760,7 +762,7 @@ class Bond {
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param now Current time
 	 */
-	void pathNegotiationCheck(void* tPtr, int64_t now);
+	void pathNegotiationCheck(void* tPtr, int64_t now) REQUIRES(_paths_m);
 
 	/**
 	 * Sends a VERB_ACK to the remote peer.
@@ -782,7 +784,7 @@ class Bond {
 	 * @param atAddress
 	 * @param now Current time
 	 */
-	void sendQOS_MEASUREMENT(void* tPtr, int pathIdx, int64_t localSocket, const InetAddress& atAddress, int64_t now);
+	void sendQOS_MEASUREMENT(void* tPtr, int pathIdx, int64_t localSocket, const InetAddress& atAddress, int64_t now) REQUIRES(_paths_m);
 
 	/**
 	 * Sends a VERB_PATH_NEGOTIATION_REQUEST to the remote peer.
@@ -790,13 +792,13 @@ class Bond {
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param path Path over which packet should be sent
 	 */
-	void sendPATH_NEGOTIATION_REQUEST(void* tPtr, int pathIdx);
+	void sendPATH_NEGOTIATION_REQUEST(void* tPtr, int pathIdx) REQUIRES(_paths_m);
 
 	/**
 	 *
 	 * @param now Current time
 	 */
-	void processBalanceTasks(int64_t now);
+	void processBalanceTasks(int64_t now) REQUIRES(_paths_m) REQUIRES(!_flows_m);
 
 	/**
 	 * Perform periodic tasks unique to active-backup
@@ -804,7 +806,7 @@ class Bond {
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param now Current time
 	 */
-	void processActiveBackupTasks(void* tPtr, int64_t now);
+	void processActiveBackupTasks(void* tPtr, int64_t now) REQUIRES(_paths_m);
 
 	/**
 	 * Switches the active link in an active-backup scenario to the next best during
@@ -812,7 +814,7 @@ class Bond {
 	 *
 	 * @param now Current time
 	 */
-	void dequeueNextActiveBackupPath(uint64_t now);
+	void dequeueNextActiveBackupPath(uint64_t now) REQUIRES(_paths_m);
 
 	/**
 	 * Zero all timers
@@ -874,7 +876,7 @@ class Bond {
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param now Current time
 	 */
-	void processBackgroundBondTasks(void* tPtr, int64_t now);
+	void processBackgroundBondTasks(void* tPtr, int64_t now) REQUIRES(!_flows_m) REQUIRES(!_paths_m);
 
 	/**
 	 * Rate limit gate for VERB_ACK
@@ -1112,7 +1114,7 @@ class Bond {
 	 *
 	 * @return True if this operation succeeded, false if otherwise
 	 */
-	bool abForciblyRotateLink();
+	bool abForciblyRotateLink() REQUIRES(!_paths_m);
 
 	/**
 	 * Emit message to tracing system but with added timestamp and subsystem info
@@ -1357,9 +1359,9 @@ class Bond {
 	/**
 	 * Paths nominated to the bond (may or may not actually be bonded)
 	 */
-	NominatedPath _paths[ZT_MAX_PEER_NETWORK_PATHS];
+	NominatedPath _paths[ZT_MAX_PEER_NETWORK_PATHS] GUARDED_BY(_paths_m);
 
-	inline int getNominatedPathIdx(const SharedPtr<Path>& path)
+	inline int getNominatedPathIdx(const SharedPtr<Path>& path) REQUIRES(_paths_m)
 	{
 		for (int i = 0; i < ZT_MAX_PEER_NETWORK_PATHS; ++i) {
 			if (_paths[i].p == path) {
@@ -1434,7 +1436,7 @@ class Bond {
 	 */
 	int _realIdxMap[ZT_MAX_PEER_NETWORK_PATHS] = { ZT_MAX_PEER_NETWORK_PATHS };
 	int _numBondedPaths;						  // Number of paths currently included in the _realIdxMap set.
-	std::map<int16_t, SharedPtr<Flow> > _flows;	  // Flows hashed according to port and protocol
+	std::map<int16_t, SharedPtr<Flow> > _flows GUARDED_BY(_flows_m);	  // Flows hashed according to port and protocol
 	float _qw[ZT_QOS_PARAMETER_SIZE];			  // Link quality specification (can be customized by user)
 
 	bool _run;

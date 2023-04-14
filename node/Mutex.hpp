@@ -16,6 +16,8 @@
 
 #include "Constants.hpp"
 
+#include "b_mutex.h"
+
 #ifdef __UNIX_LIKE__
 
 #include <stdint.h>
@@ -25,7 +27,7 @@
 namespace ZeroTier {
 
 // libpthread based mutex lock
-class Mutex
+class CAPABILITY("mutex") Mutex
 {
 public:
 	Mutex()
@@ -38,32 +40,35 @@ public:
 		pthread_mutex_destroy(&_mh);
 	}
 
-	inline void lock() const
+	inline void lock() const ACQUIRE()
 	{
 		pthread_mutex_lock(&((const_cast <Mutex *> (this))->_mh));
 	}
 
-	inline void unlock() const
+	inline void unlock() const RELEASE()
 	{
 		pthread_mutex_unlock(&((const_cast <Mutex *> (this))->_mh));
 	}
 
-	class Lock
+	// For negative capabilities.
+	const Mutex& operator!() const { return *this; }
+
+	class SCOPED_CAPABILITY Lock
 	{
 	public:
-		Lock(Mutex &m) :
+		Lock(Mutex &m) ACQUIRE(m) :
 			_m(&m)
 		{
 			m.lock();
 		}
 
-		Lock(const Mutex &m) :
+		Lock(const Mutex &m) ACQUIRE(m) :
 			_m(const_cast<Mutex *>(&m))
 		{
 			_m->lock();
 		}
 
-		~Lock()
+		~Lock() RELEASE()
 		{
 			_m->unlock();
 		}

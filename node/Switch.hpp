@@ -78,7 +78,7 @@ public:
 	 * @param data Packet data
 	 * @param len Packet length
 	 */
-	void onRemotePacket(void *tPtr,const int64_t localSocket,const InetAddress &fromAddr,const void *data,unsigned int len);
+	void onRemotePacket(void *tPtr,const int64_t localSocket,const InetAddress &fromAddr,const void *data,unsigned int len) REQUIRES(!_lastUniteAttempt_m);
 
 	/**
 	 * Returns whether our bonding or balancing policy is aware of flows.
@@ -97,7 +97,7 @@ public:
 	 * @param data Ethernet payload
 	 * @param len Frame length
 	 */
-	void onLocalEthernet(void *tPtr,const SharedPtr<Network> &network,const MAC &from,const MAC &to,unsigned int etherType,unsigned int vlanId,const void *data,unsigned int len);
+	void onLocalEthernet(void *tPtr,const SharedPtr<Network> &network,const MAC &from,const MAC &to,unsigned int etherType,unsigned int vlanId,const void *data,unsigned int len) REQUIRES(!_aqm_m) REQUIRES(!_txQueue_m) REQUIRES(!_lastSentWhoisRequest_m);
 
 	/**
 	 * Determines the next drop schedule for packets in the TX queue
@@ -125,14 +125,14 @@ public:
 	 * @param encrypt Encrypt packet payload? (always true except for HELLO)
 	 * @param qosBucket Which bucket the rule-system determined this packet should fall into
 	 */
-	void aqm_enqueue(void *tPtr, const SharedPtr<Network> &network, Packet &packet,bool encrypt,int qosBucket,int32_t flowId = ZT_QOS_NO_FLOW);
+	void aqm_enqueue(void *tPtr, const SharedPtr<Network> &network, Packet &packet,bool encrypt,int qosBucket,int32_t flowId = ZT_QOS_NO_FLOW) REQUIRES(!_aqm_m) REQUIRES(!_txQueue_m) REQUIRES(!_lastSentWhoisRequest_m);
 
 	/**
 	 * Performs a single AQM cycle and dequeues and transmits all eligible packets on all networks
 	 *
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 */
-	void aqm_dequeue(void *tPtr);
+	void aqm_dequeue(void *tPtr) REQUIRES(!_aqm_m) REQUIRES(!_txQueue_m) REQUIRES(!_lastSentWhoisRequest_m);
 
 	/**
 	 * Calls the dequeue mechanism and adjust queue state variables
@@ -171,7 +171,7 @@ public:
 	 * @param packet Packet to send (buffer may be modified)
 	 * @param encrypt Encrypt packet payload? (always true except for HELLO)
 	 */
-	void send(void *tPtr,Packet &packet,bool encrypt,int32_t flowId = ZT_QOS_NO_FLOW);
+	void send(void *tPtr,Packet &packet,bool encrypt,int32_t flowId = ZT_QOS_NO_FLOW) REQUIRES(!_txQueue_m) REQUIRES(!_lastSentWhoisRequest_m);
 
 	/**
 	 * Request WHOIS on a given address
@@ -180,7 +180,7 @@ public:
 	 * @param now Current time
 	 * @param addr Address to look up
 	 */
-	void requestWhois(void *tPtr,const int64_t now,const Address &addr);
+	void requestWhois(void *tPtr,const int64_t now,const Address &addr) REQUIRES(!_lastSentWhoisRequest_m) REQUIRES(!_txQueue_m);
 
 	/**
 	 * Run any processes that are waiting for this peer's identity
@@ -190,7 +190,7 @@ public:
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param peer New peer
 	 */
-	void doAnythingWaitingForPeer(void *tPtr,const SharedPtr<Peer> &peer);
+	void doAnythingWaitingForPeer(void *tPtr,const SharedPtr<Peer> &peer) REQUIRES(!_lastSentWhoisRequest_m) REQUIRES(!_txQueue_m);
 
 	/**
 	 * Perform retries and other periodic timer tasks
@@ -202,10 +202,10 @@ public:
 	 * @param now Current time
 	 * @return Number of milliseconds until doTimerTasks() should be run again
 	 */
-	unsigned long doTimerTasks(void *tPtr,int64_t now);
+	unsigned long doTimerTasks(void *tPtr,int64_t now) REQUIRES(!_lastSentWhoisRequest_m) REQUIRES(!_lastUniteAttempt_m) REQUIRES(!_txQueue_m);
 
 private:
-	bool _shouldUnite(const int64_t now,const Address &source,const Address &destination);
+	bool _shouldUnite(const int64_t now,const Address &source,const Address &destination) REQUIRES(!_lastUniteAttempt_m);
 	bool _trySend(void *tPtr,Packet &packet,bool encrypt,int32_t flowId = ZT_QOS_NO_FLOW); // packet is modified if return is true
 	void _sendViaSpecificPath(void *tPtr,SharedPtr<Peer> peer,SharedPtr<Path> viaPath,uint16_t userSpecifiedMtu, int64_t now,Packet &packet,bool encrypt,int32_t flowId);
 	void _recordOutgoingPacketMetrics(const Packet &p);

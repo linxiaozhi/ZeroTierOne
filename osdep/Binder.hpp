@@ -471,7 +471,7 @@ class Binder {
 	/**
 	 * @return All currently bound local interface addresses
 	 */
-	inline std::vector<InetAddress> allBoundLocalInterfaceAddresses() const
+	inline std::vector<InetAddress> allBoundLocalInterfaceAddresses() const REQUIRES(!_lock)
 	{
 		std::vector<InetAddress> aa;
 		Mutex::Lock _l(_lock);
@@ -502,7 +502,7 @@ class Binder {
 	 * @param addr Address to check
 	 * @return True if this is a bound local interface address
 	 */
-	inline bool isBoundLocalInterfaceAddress(const InetAddress& addr) const
+	inline bool isBoundLocalInterfaceAddress(const InetAddress& addr) const REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		for (unsigned int b = 0; b < _bindingCount; ++b) {
@@ -532,7 +532,7 @@ class Binder {
 	 * @param nameBuf Buffer to store name of interface which this Socket object is bound to
 	 * @param buflen Length of buffer to copy name into
 	 */
-	void getIfName(PhySocket* s, char* nameBuf, int buflen) const
+	void getIfName(PhySocket* s, char* nameBuf, int buflen) const REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		for (unsigned int b = 0, c = _bindingCount; b < c; ++b) {

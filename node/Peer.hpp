@@ -106,7 +106,7 @@ public:
 		const Packet::Verb inReVerb,
 		const bool trustEstablished,
 		const uint64_t networkId,
-		const int32_t flowId);
+		const int32_t flowId) REQUIRES(!_bond_m) REQUIRES(!_lastTriedPath_m) REQUIRES(!_paths_m);
 
 	/**
 	 * Check whether we have an active path to this peer via the given address
@@ -115,7 +115,7 @@ public:
 	 * @param addr Remote address
 	 * @return True if we have an active path to this destination
 	 */
-	inline bool hasActivePathTo(int64_t now,const InetAddress &addr) const
+	inline bool hasActivePathTo(int64_t now,const InetAddress &addr) const REQUIRES(!_paths_m)
 	{
 		Mutex::Lock _l(_paths_m);
 		for(unsigned int i=0;i<ZT_MAX_PEER_NETWORK_PATHS;++i) {
@@ -140,7 +140,7 @@ public:
 	 * @param force If true, send even if path is not alive
 	 * @return True if we actually sent something
 	 */
-	inline bool sendDirect(void *tPtr,const void *data,unsigned int len,int64_t now,bool force)
+	inline bool sendDirect(void *tPtr,const void *data,unsigned int len,int64_t now,bool force) REQUIRES(!_paths_m) REQUIRES(!_bond_m)
 	{
 		SharedPtr<Path> bp(getAppropriatePath(now,force));
 		if (bp) {
@@ -161,7 +161,7 @@ public:
 	 * @param now Current time
 	 */
 	void recordIncomingPacket(const SharedPtr<Path> &path, const uint64_t packetId,
-		uint16_t payloadLength, const Packet::Verb verb, const int32_t flowId, int64_t now);
+		uint16_t payloadLength, const Packet::Verb verb, const int32_t flowId, int64_t now) REQUIRES(!_bond_m);
 
 	/**
 	 *
@@ -173,7 +173,7 @@ public:
 	 * @param now Current time
 	 */
 	void recordOutgoingPacket(const SharedPtr<Path> &path, const uint64_t packetId,
-		uint16_t payloadLength, const Packet::Verb verb, const int32_t flowId, int64_t now);
+		uint16_t payloadLength, const Packet::Verb verb, const int32_t flowId, int64_t now) REQUIRES(!_bond_m);
 
 	/**
 	 * Record an invalid incoming packet. This packet failed
@@ -182,7 +182,7 @@ public:
 	 *
 	 * @param path Path over which packet was received
 	 */
-	void recordIncomingInvalidPacket(const SharedPtr<Path>& path);
+	void recordIncomingInvalidPacket(const SharedPtr<Path>& path) REQUIRES(!_bond_m);
 
 	/**
 	 * Get the most appropriate direct path based on current multipath and QoS configuration
@@ -191,12 +191,12 @@ public:
 	 * @param includeExpired If true, include even expired paths
 	 * @return Best current path or NULL if none
 	 */
-	SharedPtr<Path> getAppropriatePath(int64_t now, bool includeExpired, int32_t flowId = -1);
+	SharedPtr<Path> getAppropriatePath(int64_t now, bool includeExpired, int32_t flowId = -1) REQUIRES(!_bond_m) REQUIRES(!_paths_m);
 
 	/**
 	 * Send VERB_RENDEZVOUS to this and another peer via the best common IP scope and path
 	 */
-	void introduce(void *const tPtr,const int64_t now,const SharedPtr<Peer> &other) const;
+	void introduce(void *const tPtr,const int64_t now,const SharedPtr<Peer> &other) const REQUIRES(!_paths_m);
 
 	/**
 	 * Send a HELLO to this peer at a specified physical address
@@ -238,7 +238,7 @@ public:
 	 * possible with this peer. This check should be performed early in the life-cycle of the peer
 	 * as well as during the process of learning new paths.
 	 */
-	void performMultipathStateCheck(void *tPtr, int64_t now);
+	void performMultipathStateCheck(void *tPtr, int64_t now) REQUIRES(!_bond_m) REQUIRES(_paths_m);
 
 	/**
 	 * Send pings or keepalives depending on configured timeouts
@@ -250,7 +250,7 @@ public:
 	 * @param inetAddressFamily Keep this address family alive, or -1 for any
 	 * @return 0 if nothing sent or bit mask: bit 0x1 if IPv4 sent, bit 0x2 if IPv6 sent (0x3 means both sent)
 	 */
-	unsigned int doPingAndKeepalive(void *tPtr,int64_t now);
+	unsigned int doPingAndKeepalive(void *tPtr,int64_t now) REQUIRES(!_bond_m) REQUIRES(!_paths_m);
 
 	/**
 	 * Process a cluster redirect sent by this peer
@@ -260,7 +260,7 @@ public:
 	 * @param remoteAddress Remote address
 	 * @param now Current time
 	 */
-	void clusterRedirect(void *tPtr,const SharedPtr<Path> &originatingPath,const InetAddress &remoteAddress,const int64_t now);
+	void clusterRedirect(void *tPtr,const SharedPtr<Path> &originatingPath,const InetAddress &remoteAddress,const int64_t now) REQUIRES(!_paths_m);
 
 	/**
 	 * Reset paths within a given IP scope and address family
@@ -275,13 +275,13 @@ public:
 	 * @param inetAddressFamily Family e.g. AF_INET
 	 * @param now Current time
 	 */
-	void resetWithinScope(void *tPtr,InetAddress::IpScope scope,int inetAddressFamily,int64_t now);
+	void resetWithinScope(void *tPtr,InetAddress::IpScope scope,int inetAddressFamily,int64_t now) REQUIRES(!_paths_m);
 
 	/**
 	 * @param now Current time
 	 * @return All known paths to this peer
 	 */
-	inline std::vector< SharedPtr<Path> > paths(const int64_t now) const
+	inline std::vector< SharedPtr<Path> > paths(const int64_t now) const REQUIRES(!_paths_m)
 	{
 		std::vector< SharedPtr<Path> > pp;
 		Mutex::Lock _l(_paths_m);
@@ -314,7 +314,7 @@ public:
 	/**
 	 * @return Latency in milliseconds of best/aggregate path or 0xffff if unknown / no paths
 	 */
-	inline unsigned int latency(const int64_t now)
+	inline unsigned int latency(const int64_t now) REQUIRES(!_bond_m) REQUIRES(!_paths_m)
 	{
 		if (_localMultipathSupported) {
 			return (int)_lastComputedAggregateMeanLatency;
@@ -338,7 +338,7 @@ public:
 	 *
 	 * @return Relay quality score computed from latency and other factors, lower is better
 	 */
-	inline unsigned int relayQuality(const int64_t now)
+	inline unsigned int relayQuality(const int64_t now) REQUIRES(!_paths_m) REQUIRES(!_bond_m)
 	{
 		const uint64_t tsr = now - _lastReceive;
 		if (tsr >= ZT_PEER_ACTIVITY_TIMEOUT) {
@@ -440,7 +440,7 @@ public:
 	 * This does not serialize everything, just non-ephemeral information.
 	 */
 	template<unsigned int C>
-	inline void serializeForCache(Buffer<C> &b) const
+	inline void serializeForCache(Buffer<C> &b) const REQUIRES(!_paths_m)
 	{
 		b.append((uint8_t)2);
 
@@ -520,14 +520,14 @@ public:
 	/**
 	 * @return The bonding policy used to reach this peer
 	 */
-	SharedPtr<Bond> bond() {
+	SharedPtr<Bond> bond() REQUIRES(!_bond_m) {
 		return _bond;
 	}
 
 	/**
 	 * @return The bonding policy used to reach this peer
 	 */
-	inline int8_t bondingPolicy() {
+	inline int8_t bondingPolicy() REQUIRES(!_bond_m) {
 		Mutex::Lock _l(_bond_m);
 		if (_bond) {
 			return _bond->policy();
@@ -577,10 +577,10 @@ private:
 	uint16_t _vMinor;
 	uint16_t _vRevision;
 
-	std::list< std::pair< Path *, int64_t > > _lastTriedPath;
+	std::list< std::pair< Path *, int64_t > > _lastTriedPath GUARDED_BY(_lastTriedPath_m);
 	Mutex _lastTriedPath_m;
 
-	_PeerPath _paths[ZT_MAX_PEER_NETWORK_PATHS];
+	_PeerPath _paths[ZT_MAX_PEER_NETWORK_PATHS] GUARDED_BY(_paths_m);
 	Mutex _paths_m;
 	Mutex _bond_m;
 
@@ -599,7 +599,7 @@ private:
 
 	int32_t _lastComputedAggregateMeanLatency;
 
-	SharedPtr<Bond> _bond;
+	SharedPtr<Bond> _bond GUARDED_BY(_bond_m);
 };
 
 } // namespace ZeroTier

@@ -155,6 +155,7 @@ public:
                         char paddr[128];
                         PM_TRACE("PortMapper: NAT-PMP: mapped %u to %s" ZT_EOL_S,(unsigned int)localPort,publicAddress.toString(paddr));
 #endif
+                        EXCLUDES(xxx)
 						Mutex::Lock sl(surface_l);
 						surface.clear();
 						surface.push_back(publicAddress);
@@ -241,6 +242,7 @@ public:
 #ifdef ZT_PORTMAPPER_TRACE
                                         PM_TRACE("PortMapper: UPnP: reusing previously reserved external port: %s" ZT_EOL_S,outport);
 #endif
+                                        EXCLUDES(xxx)
 										Mutex::Lock sl(surface_l);
 										surface.clear();
 										InetAddress tmp(externalip);
@@ -324,6 +326,7 @@ PortMapper::~PortMapper()
 
 std::vector<InetAddress> PortMapper::get() const
 {
+    EXCLUDES(xxx)
 	Mutex::Lock _l(_impl->surface_l);
 	return _impl->surface;
 }

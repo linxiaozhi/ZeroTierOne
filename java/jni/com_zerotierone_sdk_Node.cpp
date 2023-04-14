@@ -680,7 +680,7 @@ namespace {
     NodeMap nodeMap;
     ZeroTier::Mutex nodeMapMutex;
 
-    bool isInited(int64_t nodeId) {
+    bool isInited(int64_t nodeId) REQUIRES(!nodeMapMutex) {
 
         ZeroTier::Mutex::Lock lock(nodeMapMutex);
         NodeMap::iterator found = nodeMap.find(nodeId);
@@ -700,7 +700,7 @@ namespace {
         return ref->inited;
     }
 
-    bool JniRef::finishInitializing() {
+    bool JniRef::finishInitializing() REQUIRES(!nodeMapMutex) {
 
         ZeroTier::Mutex::Lock lock(nodeMapMutex);
         NodeMap::iterator found = nodeMap.find(id);
@@ -721,7 +721,7 @@ namespace {
         return true;
     }
 
-    ZT_Node* findNode(int64_t nodeId)
+    ZT_Node* findNode(int64_t nodeId) REQUIRES(!nodeMapMutex)
     {
         ZeroTier::Mutex::Lock lock(nodeMapMutex);
         NodeMap::iterator found = nodeMap.find(nodeId);
@@ -735,7 +735,7 @@ namespace {
         return ref->node;
     }
 
-    JniRef *removeRef(int64_t nodeId) {
+    JniRef *removeRef(int64_t nodeId) REQUIRES(!nodeMapMutex) {
 
         ZeroTier::Mutex::Lock lock(nodeMapMutex);
 

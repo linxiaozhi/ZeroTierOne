@@ -57,7 +57,7 @@ public:
 	 * @param peer Peer to add
 	 * @return New or existing peer (should replace 'peer')
 	 */
-	SharedPtr<Peer> addPeer(void *tPtr,const SharedPtr<Peer> &peer);
+	SharedPtr<Peer> addPeer(void *tPtr,const SharedPtr<Peer> &peer) REQUIRES(!_peers_m);
 
 	/**
 	 * Get a peer from its address
@@ -66,14 +66,14 @@ public:
 	 * @param zta ZeroTier address of peer
 	 * @return Peer or NULL if not found
 	 */
-	SharedPtr<Peer> getPeer(void *tPtr,const Address &zta);
+	SharedPtr<Peer> getPeer(void *tPtr,const Address &zta) REQUIRES(!_peers_m);
 
 	/**
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param zta ZeroTier address of peer
 	 * @return Identity or NULL identity if not found
 	 */
-	Identity getIdentity(void *tPtr,const Address &zta);
+	Identity getIdentity(void *tPtr,const Address &zta) REQUIRES(!_peers_m);
 
 	/**
 	 * Get a peer only if it is presently in memory (no disk cache)
@@ -85,7 +85,7 @@ public:
 	 *
 	 * @param zta ZeroTier address
 	 */
-	inline SharedPtr<Peer> getPeerNoCache(const Address &zta)
+	inline SharedPtr<Peer> getPeerNoCache(const Address &zta) REQUIRES(!_peers_m)
 	{
 		Mutex::Lock _l(_peers_m);
 		const SharedPtr<Peer> *const ap = _peers.get(zta);
@@ -102,7 +102,7 @@ public:
 	 * @param r Remote address
 	 * @return Pointer to canonicalized Path object
 	 */
-	inline SharedPtr<Path> getPath(const int64_t l,const InetAddress &r)
+	inline SharedPtr<Path> getPath(const int64_t l,const InetAddress &r) REQUIRES(!_paths_m)
 	{
 		Mutex::Lock _l(_paths_m);
 		SharedPtr<Path> &p = _paths[Path::HashKey(l,r)];
@@ -117,25 +117,25 @@ public:
 	 *
 	 * @return Upstream or NULL if none available
 	 */
-	SharedPtr<Peer> getUpstreamPeer();
+	SharedPtr<Peer> getUpstreamPeer() REQUIRES(!_peers_m) REQUIRES(!_upstreams_m);
 
 	/**
 	 * @param id Identity to check
 	 * @return True if this is a root server or a network preferred relay from one of our networks
 	 */
-	bool isUpstream(const Identity &id) const;
+	bool isUpstream(const Identity &id) const REQUIRES(!_upstreams_m);
 
 	/**
 	 * @param addr Address to check
 	 * @return True if we should accept a world update from this address
 	 */
-	bool shouldAcceptWorldUpdateFrom(const Address &addr) const;
+	bool shouldAcceptWorldUpdateFrom(const Address &addr) const REQUIRES(!_upstreams_m);
 
 	/**
 	 * @param ztaddr ZeroTier address
 	 * @return Peer role for this device
 	 */
-	ZT_PeerRole role(const Address &ztaddr) const;
+	ZT_PeerRole role(const Address &ztaddr) const REQUIRES(!_upstreams_m);
 
 	/**
 	 * Check for prohibited endpoints
@@ -151,14 +151,14 @@ public:
 	 * @param ipaddr IP address
 	 * @return True if this ZT/IP pair should not be allowed to be used
 	 */
-	bool isProhibitedEndpoint(const Address &ztaddr,const InetAddress &ipaddr) const;
+	bool isProhibitedEndpoint(const Address &ztaddr,const InetAddress &ipaddr) const REQUIRES(!_upstreams_m);
 
 	/**
 	 * Gets upstreams to contact and their stable endpoints (if known)
 	 *
 	 * @param eps Hash table to fill with addresses and their stable endpoints
 	 */
-	inline void getUpstreamsToContact(Hashtable< Address,std::vector<InetAddress> > &eps) const
+	inline void getUpstreamsToContact(Hashtable< Address,std::vector<InetAddress> > &eps) const REQUIRES(!_upstreams_m)
 	{
 		Mutex::Lock _l(_upstreams_m);
 		for(std::vector<World::Root>::const_iterator i(_planet.roots().begin());i!=_planet.roots().end();++i) {
@@ -191,7 +191,7 @@ public:
 	/**
 	 * @return Vector of active upstream addresses (including roots)
 	 */
-	inline std::vector<Address> upstreamAddresses() const
+	inline std::vector<Address> upstreamAddresses() const REQUIRES(!_upstreams_m)
 	{
 		Mutex::Lock _l(_upstreams_m);
 		return _upstreamAddresses;
@@ -200,7 +200,7 @@ public:
 	/**
 	 * @return Current moons
 	 */
-	inline std::vector<World> moons() const
+	inline std::vector<World> moons() const REQUIRES(!_upstreams_m)
 	{
 		Mutex::Lock _l(_upstreams_m);
 		return _moons;
@@ -209,7 +209,7 @@ public:
 	/**
 	 * @return Moon IDs we are waiting for from seeds
 	 */
-	inline std::vector<uint64_t> moonsWanted() const
+	inline std::vector<uint64_t> moonsWanted() const REQUIRES(!_upstreams_m)
 	{
 		Mutex::Lock _l(_upstreams_m);
 		std::vector<uint64_t> mw;
@@ -224,7 +224,7 @@ public:
 	/**
 	 * @return Current planet
 	 */
-	inline World planet() const
+	inline World planet() const REQUIRES(!_upstreams_m)
 	{
 		Mutex::Lock _l(_upstreams_m);
 		return _planet;
@@ -233,7 +233,7 @@ public:
 	/**
 	 * @return Current planet's world ID
 	 */
-	inline uint64_t planetWorldId() const
+	inline uint64_t planetWorldId() const NO_THREAD_SAFETY_ANALYSIS
 	{
 		return _planet.id(); // safe to read without lock, and used from within eachPeer() so don't lock
 	}
@@ -241,7 +241,7 @@ public:
 	/**
 	 * @return Current planet's world timestamp
 	 */
-	inline uint64_t planetWorldTimestamp() const
+	inline uint64_t planetWorldTimestamp() const NO_THREAD_SAFETY_ANALYSIS
 	{
 		return _planet.timestamp(); // safe to read without lock, and used from within eachPeer() so don't lock
 	}
@@ -254,7 +254,7 @@ public:
 	 * @param alwaysAcceptNew If true, always accept new moons even if we're not waiting for one
 	 * @return True if it was valid and newer than current (or totally new for moons)
 	 */
-	bool addWorld(void *tPtr,const World &newWorld,bool alwaysAcceptNew);
+	bool addWorld(void *tPtr,const World &newWorld,bool alwaysAcceptNew) REQUIRES(!_peers_m) REQUIRES(!_upstreams_m);
 
 	/**
 	 * Add a moon
@@ -265,7 +265,7 @@ public:
 	 * @param id Moon ID
 	 * @param seed If non-NULL, an address of any member of the moon to contact
 	 */
-	void addMoon(void *tPtr,const uint64_t id,const Address &seed);
+	void addMoon(void *tPtr,const uint64_t id,const Address &seed) REQUIRES(!_peers_m) REQUIRES(!_upstreams_m);
 
 	/**
 	 * Remove a moon
@@ -273,18 +273,18 @@ public:
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param id Moon's world ID
 	 */
-	void removeMoon(void *tPtr,const uint64_t id);
+	void removeMoon(void *tPtr,const uint64_t id) REQUIRES(!_peers_m) REQUIRES(!_upstreams_m);
 
 	/**
 	 * Clean and flush database
 	 */
-	void doPeriodicTasks(void *tPtr,int64_t now);
+	void doPeriodicTasks(void *tPtr,int64_t now) REQUIRES(!_peers_m) REQUIRES(!_upstreams_m);
 
 	/**
 	 * @param now Current time
 	 * @return Number of peers with active direct paths
 	 */
-	inline unsigned long countActive(int64_t now) const
+	inline unsigned long countActive(int64_t now) const REQUIRES(!_peers_m)
 	{
 		unsigned long cnt = 0;
 		Mutex::Lock _l(_peers_m);
@@ -307,7 +307,7 @@ public:
 	 * @tparam F Function or function object type
 	 */
 	template<typename F>
-	inline void eachPeer(F f)
+	inline void eachPeer(F f) REQUIRES(!_peers_m)
 	{
 		Mutex::Lock _l(_peers_m);
 		Hashtable< Address,SharedPtr<Peer> >::Iterator i(_peers);
@@ -321,7 +321,7 @@ public:
 	/**
 	 * @return All currently active peers by address (unsorted)
 	 */
-	inline std::vector< std::pair< Address,SharedPtr<Peer> > > allPeers() const
+	inline std::vector< std::pair< Address,SharedPtr<Peer> > > allPeers() const REQUIRES(!_peers_m)
 	{
 		Mutex::Lock _l(_peers_m);
 		return _peers.entries();
@@ -441,7 +441,7 @@ public:
 
 private:
 	Identity _getIdentity(void *tPtr,const Address &zta);
-	void _memoizeUpstreams(void *tPtr);
+	void _memoizeUpstreams(void *tPtr) REQUIRES(_peers_m) REQUIRES(_upstreams_m);
 	void _savePeer(void *tPtr,const SharedPtr<Peer> &peer);
 
 	const RuntimeEnvironment *const RR;
@@ -449,16 +449,16 @@ private:
 	std::pair<InetAddress,ZT_PhysicalPathConfiguration> _physicalPathConfig[ZT_MAX_CONFIGURABLE_PATHS];
 	volatile unsigned int _numConfiguredPhysicalPaths;
 
-	Hashtable< Address,SharedPtr<Peer> > _peers;
+	Hashtable< Address,SharedPtr<Peer> > _peers GUARDED_BY(_peers_m);
 	Mutex _peers_m;
 
-	Hashtable< Path::HashKey,SharedPtr<Path> > _paths;
+	Hashtable< Path::HashKey,SharedPtr<Path> > _paths GUARDED_BY(_paths_m);
 	Mutex _paths_m;
 
-	World _planet;
-	std::vector<World> _moons;
-	std::vector< std::pair<uint64_t,Address> > _moonSeeds;
-	std::vector<Address> _upstreamAddresses;
+	World _planet GUARDED_BY(_upstreams_m);
+	std::vector<World> _moons GUARDED_BY(_upstreams_m);
+	std::vector< std::pair<uint64_t,Address> > _moonSeeds GUARDED_BY(_upstreams_m);
+	std::vector<Address> _upstreamAddresses GUARDED_BY(_upstreams_m);
 	bool _amUpstream;
 	Mutex _upstreams_m; // locks worlds, upstream info, moon info, etc.
 };

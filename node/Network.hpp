@@ -86,7 +86,7 @@ public:
 	inline bool multicastEnabled() const { return (_config.multicastLimit > 0); }
 	inline bool hasConfig() const { return (_config); }
 	inline uint64_t lastConfigUpdate() const { return _lastConfigUpdate; }
-	inline ZT_VirtualNetworkStatus status() const { Mutex::Lock _l(_lock); return _status(); }
+	inline ZT_VirtualNetworkStatus status() const REQUIRES(!_lock) { Mutex::Lock _l(_lock); return _status(); }
 	inline const NetworkConfig &config() const { return _config; }
 	inline const MAC &mac() const { return _mac; }
 
@@ -121,7 +121,7 @@ public:
 		const unsigned int frameLen,
 		const unsigned int etherType,
 		const unsigned int vlanId,
-		uint8_t &qosBucket);
+		uint8_t &qosBucket) REQUIRES(!_lock);
 
 	/**
 	 * Apply filters to an incoming packet
@@ -151,7 +151,7 @@ public:
 		const uint8_t *frameData,
 		const unsigned int frameLen,
 		const unsigned int etherType,
-		const unsigned int vlanId);
+		const unsigned int vlanId) REQUIRES(!_lock);
 
 	/**
 	 * Check whether we are subscribed to a multicast group
@@ -160,7 +160,7 @@ public:
 	 * @param includeBridgedGroups If true, also check groups we've learned via bridging
 	 * @return True if this network endpoint / peer is a member
 	 */
-	bool subscribedToMulticastGroup(const MulticastGroup &mg,bool includeBridgedGroups) const;
+	bool subscribedToMulticastGroup(const MulticastGroup &mg,bool includeBridgedGroups) const REQUIRES(!_lock);
 
 	/**
 	 * Subscribe to a multicast group
@@ -168,14 +168,14 @@ public:
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param mg New multicast group
 	 */
-	void multicastSubscribe(void *tPtr,const MulticastGroup &mg);
+	void multicastSubscribe(void *tPtr,const MulticastGroup &mg) REQUIRES(!_lock);
 
 	/**
 	 * Unsubscribe from a multicast group
 	 *
 	 * @param mg Multicast group
 	 */
-	void multicastUnsubscribe(const MulticastGroup &mg);
+	void multicastUnsubscribe(const MulticastGroup &mg) REQUIRES(!_lock);
 
 	/**
 	 * Handle an inbound network config chunk
@@ -191,7 +191,7 @@ public:
 	 * @param ptr Index of chunk and related fields in packet
 	 * @return Update ID if update was fully assembled and accepted or 0 otherwise
 	 */
-	uint64_t handleConfigChunk(void *tPtr,const uint64_t packetId,const Address &source,const Buffer<ZT_PROTO_MAX_PACKET_LENGTH> &chunk,unsigned int ptr);
+	uint64_t handleConfigChunk(void *tPtr,const uint64_t packetId,const Address &source,const Buffer<ZT_PROTO_MAX_PACKET_LENGTH> &chunk,unsigned int ptr) REQUIRES(!_lock);
 
 	/**
 	 * Set network configuration
@@ -201,12 +201,12 @@ public:
 	 * @param saveToDisk Save to disk? Used during loading, should usually be true otherwise.
 	 * @return 0 == bad, 1 == accepted but duplicate/unchanged, 2 == accepted and new
 	 */
-	int setConfiguration(void *tPtr,const NetworkConfig &nconf,bool saveToDisk);
+	int setConfiguration(void *tPtr,const NetworkConfig &nconf,bool saveToDisk) REQUIRES(!_lock);
 
 	/**
 	 * Set netconf failure to 'access denied' -- called in IncomingPacket when controller reports this
 	 */
-	inline void setAccessDenied(void *tPtr)
+	inline void setAccessDenied(void *tPtr) REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		_netconfFailure = NETCONF_FAILURE_ACCESS_DENIED;
@@ -217,7 +217,7 @@ public:
 	/**
 	 * Set netconf failure to 'not found' -- called by IncomingPacket when controller reports this
 	 */
-	inline void setNotFound(void *tPtr)
+	inline void setNotFound(void *tPtr) REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		_netconfFailure = NETCONF_FAILURE_NOT_FOUND;
@@ -228,7 +228,7 @@ public:
 	/**
 	 * Set netconf failure to 'authentication required' possibly with an authorization URL
 	 */
-	inline void setAuthenticationRequired(void *tPtr, const char *url)
+	inline void setAuthenticationRequired(void *tPtr, const char *url) REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		_netconfFailure = NETCONF_FAILURE_AUTHENTICATION_REQUIRED;
@@ -242,14 +242,14 @@ public:
 	 * set netconf failure to 'authentication required' along with info needed
 	 * for sso full flow authentication.
 	 */
-	void setAuthenticationRequired(void *tPtr, const char* issuerURL, const char* centralEndpoint, const char* clientID, const char *ssoProvider, const char* nonce, const char* state);
+	void setAuthenticationRequired(void *tPtr, const char* issuerURL, const char* centralEndpoint, const char* clientID, const char *ssoProvider, const char* nonce, const char* state) REQUIRES(!_lock);
 
 	/**
 	 * Causes this network to request an updated configuration from its master node now
 	 *
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 */
-	void requestConfiguration(void *tPtr);
+	void requestConfiguration(void *tPtr) REQUIRES(!_lock);
 
 	/**
 	 * Determine whether this peer is permitted to communicate on this network
@@ -257,7 +257,7 @@ public:
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 * @param peer Peer to check
 	 */
-	bool gate(void *tPtr,const SharedPtr<Peer> &peer);
+	bool gate(void *tPtr,const SharedPtr<Peer> &peer) REQUIRES(!_lock);
 
 	/**
 	 * Check whether a given peer has recently had an association with this network
@@ -270,19 +270,19 @@ public:
 	 * @param addr Peer address
 	 * @return True if peer has recently associated
 	 */
-	bool recentlyAssociatedWith(const Address &addr);
+	bool recentlyAssociatedWith(const Address &addr) REQUIRES(!_lock);
 
 	/**
 	 * Do periodic cleanup and housekeeping tasks
 	 */
-	void clean();
+	void clean() REQUIRES(!_lock);
 
 	/**
 	 * Push state to members such as multicast group memberships and latest COM (if needed)
 	 *
 	 * @param tPtr Thread pointer to be handed through to any callbacks called as a result of this call
 	 */
-	inline void sendUpdatesToMembers(void *tPtr)
+	inline void sendUpdatesToMembers(void *tPtr) REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		_sendUpdatesToMembers(tPtr,(const MulticastGroup *)0);
@@ -294,7 +294,7 @@ public:
 	 * @param mac MAC address
 	 * @return ZeroTier address of bridge to this MAC
 	 */
-	inline Address findBridgeTo(const MAC &mac) const
+	inline Address findBridgeTo(const MAC &mac) const REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		const Address *const br = _remoteBridgeRoutes.get(mac);
@@ -312,7 +312,7 @@ public:
 	 * @param mac MAC address of destination
 	 * @param addr Bridge this MAC is reachable behind
 	 */
-	void learnBridgeRoute(const MAC &mac,const Address &addr);
+	void learnBridgeRoute(const MAC &mac,const Address &addr) REQUIRES(!_lock);
 
 	/**
 	 * Learn a multicast group that is bridged to our tap device
@@ -321,17 +321,17 @@ public:
 	 * @param mg Multicast group
 	 * @param now Current time
 	 */
-	void learnBridgedMulticastGroup(void *tPtr,const MulticastGroup &mg,int64_t now);
+	void learnBridgedMulticastGroup(void *tPtr,const MulticastGroup &mg,int64_t now) REQUIRES(!_lock);
 
 	/**
 	 * Validate a credential and learn it if it passes certificate and other checks
 	 */
-	Membership::AddCredentialResult addCredential(void *tPtr,const CertificateOfMembership &com);
+	Membership::AddCredentialResult addCredential(void *tPtr,const CertificateOfMembership &com) REQUIRES(!_lock);
 
 	/**
 	 * Validate a credential and learn it if it passes certificate and other checks
 	 */
-	inline Membership::AddCredentialResult addCredential(void *tPtr,const Capability &cap)
+	inline Membership::AddCredentialResult addCredential(void *tPtr,const Capability &cap) REQUIRES(!_lock)
 	{
 		if (cap.networkId() != _id) {
 			return Membership::ADD_REJECTED;
@@ -343,7 +343,7 @@ public:
 	/**
 	 * Validate a credential and learn it if it passes certificate and other checks
 	 */
-	inline Membership::AddCredentialResult addCredential(void *tPtr,const Tag &tag)
+	inline Membership::AddCredentialResult addCredential(void *tPtr,const Tag &tag) REQUIRES(!_lock)
 	{
 		if (tag.networkId() != _id) {
 			return Membership::ADD_REJECTED;
@@ -355,12 +355,12 @@ public:
 	/**
 	 * Validate a credential and learn it if it passes certificate and other checks
 	 */
-	Membership::AddCredentialResult addCredential(void *tPtr,const Address &sentFrom,const Revocation &rev);
+	Membership::AddCredentialResult addCredential(void *tPtr,const Address &sentFrom,const Revocation &rev) REQUIRES(!_lock);
 
 	/**
 	 * Validate a credential and learn it if it passes certificate and other checks
 	 */
-	inline Membership::AddCredentialResult addCredential(void *tPtr,const CertificateOfOwnership &coo)
+	inline Membership::AddCredentialResult addCredential(void *tPtr,const CertificateOfOwnership &coo) REQUIRES(!_lock)
 	{
 		if (coo.networkId() != _id) {
 			return Membership::ADD_REJECTED;
@@ -376,7 +376,7 @@ public:
 	 * @param to Destination peer address
 	 * @param now Current time
 	 */
-	inline void peerRequestedCredentials(void *tPtr,const Address &to,const int64_t now)
+	inline void peerRequestedCredentials(void *tPtr,const Address &to,const int64_t now) REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		Membership &m = _membership(to);
@@ -393,7 +393,7 @@ public:
 	 * @param to Destination peer address
 	 * @param now Current time
 	 */
-	inline void pushCredentialsIfNeeded(void *tPtr,const Address &to,const int64_t now)
+	inline void pushCredentialsIfNeeded(void *tPtr,const Address &to,const int64_t now) REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		Membership &m = _membership(to);
@@ -409,14 +409,14 @@ public:
 	 * This sets the network to completely remove itself on delete. This also prevents the
 	 * call of the normal port shutdown event on delete.
 	 */
-	void destroy();
+	void destroy() REQUIRES(!_lock);
 
 	/**
 	 * Get this network's config for export via the ZT core API
 	 *
 	 * @param ec Buffer to fill with externally-visible network configuration
 	 */
-	inline void externalConfig(ZT_VirtualNetworkConfig *ec) const
+	inline void externalConfig(ZT_VirtualNetworkConfig *ec) const REQUIRES(!_lock)
 	{
 		Mutex::Lock _l(_lock);
 		_externalConfig(ec);

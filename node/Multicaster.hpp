@@ -55,7 +55,7 @@ public:
 	 * @param mg Multicast group
 	 * @param member New member address
 	 */
-	inline void add(void *tPtr,int64_t now,uint64_t nwid,const MulticastGroup &mg,const Address &member)
+	inline void add(void *tPtr,int64_t now,uint64_t nwid,const MulticastGroup &mg,const Address &member) REQUIRES(!_groups_m)
 	{
 		Mutex::Lock _l(_groups_m);
 		_add(tPtr,now,nwid,mg,_groups[Multicaster::Key(nwid,mg)],member);
@@ -74,7 +74,7 @@ public:
 	 * @param count Number of addresses
 	 * @param totalKnown Total number of known addresses as reported by peer
 	 */
-	void addMultiple(void *tPtr,int64_t now,uint64_t nwid,const MulticastGroup &mg,const void *addresses,unsigned int count,unsigned int totalKnown);
+	void addMultiple(void *tPtr,int64_t now,uint64_t nwid,const MulticastGroup &mg,const void *addresses,unsigned int count,unsigned int totalKnown) REQUIRES(!_groups_m);
 
 	/**
 	 * Remove a multicast group member (if present)
@@ -83,7 +83,7 @@ public:
 	 * @param mg Multicast group
 	 * @param member Member to unsubscribe
 	 */
-	void remove(uint64_t nwid,const MulticastGroup &mg,const Address &member);
+	void remove(uint64_t nwid,const MulticastGroup &mg,const Address &member) REQUIRES(!_groups_m);
 
 	/**
 	 * Append gather results to a packet by choosing registered multicast recipients at random
@@ -103,7 +103,7 @@ public:
 	 * @return Number of addresses appended
 	 * @throws std::out_of_range Buffer overflow writing to packet
 	 */
-	unsigned int gather(const Address &queryingPeer,uint64_t nwid,const MulticastGroup &mg,Buffer<ZT_PROTO_MAX_PACKET_LENGTH> &appendTo,unsigned int limit) const;
+	unsigned int gather(const Address &queryingPeer,uint64_t nwid,const MulticastGroup &mg,Buffer<ZT_PROTO_MAX_PACKET_LENGTH> &appendTo,unsigned int limit) const REQUIRES(!_groups_m);
 
 	/**
 	 * Get subscribers to a multicast group
@@ -111,7 +111,7 @@ public:
 	 * @param nwid Network ID
 	 * @param mg Multicast group
 	 */
-	std::vector<Address> getMembers(uint64_t nwid,const MulticastGroup &mg,unsigned int limit) const;
+	std::vector<Address> getMembers(uint64_t nwid,const MulticastGroup &mg,unsigned int limit) const REQUIRES(!_groups_m);
 
 	/**
 	 * Send a multicast
@@ -135,7 +135,7 @@ public:
 		const MAC &src,
 		unsigned int etherType,
 		const void *data,
-		unsigned int len);
+		unsigned int len) REQUIRES(!_groups_m);
 
 	/**
 	 * Clean database
@@ -143,7 +143,7 @@ public:
 	 * @param RR Runtime environment
 	 * @param now Current time
 	 */
-	void clean(int64_t now);
+	void clean(int64_t now) REQUIRES(!_groups_m);
 
 private:
 	struct Key
@@ -188,7 +188,7 @@ private:
 
 	const RuntimeEnvironment *const RR;
 
-	Hashtable<Multicaster::Key,MulticastGroupStatus> _groups;
+	Hashtable<Multicaster::Key,MulticastGroupStatus> _groups GUARDED_BY(_groups_m);
 	Mutex _groups_m;
 };
 
