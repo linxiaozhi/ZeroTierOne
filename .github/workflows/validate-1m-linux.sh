@@ -3,7 +3,7 @@
 # This test script joins Earth and pokes some stuff
 
 TEST_NETWORK=8056c2e21c000001
-RUN_LENGTH=10
+RUN_LENGTH=60
 TEST_FINISHED=false
 ZTO_VER=$(git describe --tags $(git rev-list --tags --max-count=1))
 ZTO_COMMIT=$(git rev-parse HEAD)
@@ -96,7 +96,7 @@ echo -e "\nStarting a ZeroTier instance in each namespace..."
 time_test_start=`date +%s`
 
 # Spam the CLI as ZeroTier is starting
-spam_cli 100 &
+test_spam_cli 100 &
 
 echo "Starting memory leak check"
 $NS1 sudo valgrind --demangle=yes --exit-on-first-error=yes \
@@ -112,39 +112,6 @@ $NS2 sudo ./zerotier-one node2 -U -p9997 >>node_2.log 2>&1 &
 ################################################################################
 # Online Check                                                                 #
 ################################################################################
-
-spam_cli()
-{
-      echo "Spamming CLI..."
-      # Rapidly spam the CLI with joins/leaves
-
-      MAX_TRIES="${$1:-10}"
-
-      for ((s=0; s<=MAX_TRIES; s++))
-      do
-            $ZT1 status
-            $ZT2 status
-            sleep 0.1
-      done
-
-      SPAM_TRIES=128
-
-      for ((s=0; s<=SPAM_TRIES; s++))
-      do
-            $ZT1 join $TEST_NETWORK
-      done
-
-      for ((s=0; s<=SPAM_TRIES; s++))
-      do
-            $ZT1 leave $TEST_NETWORK
-      done
-
-      for ((s=0; s<=SPAM_TRIES; s++))
-      do
-            $ZT1 leave $TEST_NETWORK
-            $ZT1 join $TEST_NETWORK
-      done
-}
 
 echo "Waiting for ZeroTier to come online before attempting test..."
 MAX_WAIT_SECS="${MAX_WAIT_SECS:-120}"
@@ -211,29 +178,7 @@ sleep 10
 node1_ip4=$($ZT1 get $TEST_NETWORK ip4)
 node2_ip4=$($ZT2 get $TEST_NETWORK ip4)
 
-echo "node1_ip4=$node1_ip4"
-echo "node2_ip4=$node2_ip4"
-
-echo -e "\nPinging each node"
-
-PING12_FILENAME="$TEST_FILEPATH_PREFIX-ping-1-to-2.txt"
-PING21_FILENAME="$TEST_FILEPATH_PREFIX-ping-2-to-1.txt"
-
-$NS1 ping -c 16 $node2_ip4 > $PING12_FILENAME
-$NS2 ping -c 16 $node1_ip4 > $PING21_FILENAME
-
-# Parse ping statistics
-ping_loss_percent_1_to_2="${ping_loss_percent_1_to_2:-100.0}"
-ping_loss_percent_2_to_1="${ping_loss_percent_2_to_1:-100.0}"
-
-ping_loss_percent_1_to_2=$(cat $PING12_FILENAME | \
-      grep "packet loss" | awk '{print $6}' | sed 's/%//')
-ping_loss_percent_2_to_1=$(cat $PING21_FILENAME | \
-      grep "packet loss" | awk '{print $6}' | sed 's/%//')
-
-# Normalize loss value
-ping_loss_percent_1_to_2=$(echo "scale=2; $ping_loss_percent_1_to_2/100.0" | bc)
-ping_loss_percent_2_to_1=$(echo "scale=2; $ping_loss_percent_2_to_1/100.0" | bc)
+test_ping_between_nodes 16
 
 ################################################################################
 # CLI Check                                                                    #
@@ -241,7 +186,7 @@ ping_loss_percent_2_to_1=$(echo "scale=2; $ping_loss_percent_2_to_1/100.0" | bc)
 
 echo "Testing basic CLI functionality..."
 
-spam_cli 10 &
+test_spam_cli 10 &
 
 $ZT1 join $TEST_NETWORK
 
@@ -433,5 +378,73 @@ EOF
 
 echo $summary > $FILENAME_SUMMARY
 cat $FILENAME_SUMMARY
+
+################################################################################
+# Test functions                                                               #
+################################################################################
+
+test_spam_cli()
+{
+      echo "Spamming CLI..."
+      # Rapidly spam the CLI with joins/leaves
+
+      MAX_TRIES="${$1:-10}"
+
+      for ((s=0; s<=MAX_TRIES; s++))
+      do
+            $ZT1 status
+            $ZT2 status
+            sleep 0.1
+      done
+
+      SPAM_TRIES=128
+
+      for ((s=0; s<=SPAM_TRIES; s++))
+      do
+            $ZT1 join $TEST_NETWORK
+            $ZT2 join $TEST_NETWORK
+      done
+
+      for ((s=0; s<=SPAM_TRIES; s++))
+      do
+            $ZT1 leave $TEST_NETWORK
+            $ZT2 leave $TEST_NETWORK
+      done
+
+      for ((s=0; s<=SPAM_TRIES; s++))
+      do
+            $ZT1 leave $TEST_NETWORK
+            $ZT1 join $TEST_NETWORK
+            $ZT2 leave $TEST_NETWORK
+            $ZT2 join $TEST_NETWORK
+      done
+}
+
+test_ping_between_nodes()
+{
+      echo "node1_ip4=$node1_ip4"
+      echo "node2_ip4=$node2_ip4"
+
+      echo -e "\nPinging each node"
+
+      PING12_FILENAME="$TEST_FILEPATH_PREFIX-ping-1-to-2.txt"
+      PING21_FILENAME="$TEST_FILEPATH_PREFIX-ping-2-to-1.txt"
+
+      $NS1 ping -c 16 $node2_ip4 > $PING12_FILENAME
+      $NS2 ping -c 16 $node1_ip4 > $PING21_FILENAME
+
+      # Parse ping statistics
+      ping_loss_percent_1_to_2="${ping_loss_percent_1_to_2:-100.0}"
+      ping_loss_percent_2_to_1="${ping_loss_percent_2_to_1:-100.0}"
+
+      ping_loss_percent_1_to_2=$(cat $PING12_FILENAME | \
+            grep "packet loss" | awk '{print $6}' | sed 's/%//')
+      ping_loss_percent_2_to_1=$(cat $PING21_FILENAME | \
+            grep "packet loss" | awk '{print $6}' | sed 's/%//')
+
+      # Normalize loss value
+      ping_loss_percent_1_to_2=$(echo "scale=2; $ping_loss_percent_1_to_2/100.0" | bc)
+      ping_loss_percent_2_to_1=$(echo "scale=2; $ping_loss_percent_2_to_1/100.0" | bc)
+}
 
 "$@"
