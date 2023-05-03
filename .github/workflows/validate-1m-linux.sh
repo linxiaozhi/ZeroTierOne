@@ -96,7 +96,7 @@ echo -e "\nStarting a ZeroTier instance in each namespace..."
 time_test_start=`date +%s`
 
 # Spam the CLI as ZeroTier is starting
-spam_cli 100
+spam_cli 100 &
 
 echo "Starting memory leak check"
 $NS1 sudo valgrind --demangle=yes --exit-on-first-error=yes \
@@ -241,7 +241,7 @@ ping_loss_percent_2_to_1=$(echo "scale=2; $ping_loss_percent_2_to_1/100.0" | bc)
 
 echo "Testing basic CLI functionality..."
 
-spam_cli 10
+spam_cli 10 &
 
 $ZT1 join $TEST_NETWORK
 
