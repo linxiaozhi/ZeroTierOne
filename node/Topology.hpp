@@ -278,7 +278,7 @@ public:
 	/**
 	 * Clean and flush database
 	 */
-	void doPeriodicTasks(void *tPtr,int64_t now) REQUIRES(!_peers_m) REQUIRES(!_upstreams_m);
+	void doPeriodicTasks(void *tPtr,int64_t now) REQUIRES(!_peers_m) REQUIRES(!_upstreams_m) REQUIRES(!_paths_m);
 
 	/**
 	 * @param now Current time
