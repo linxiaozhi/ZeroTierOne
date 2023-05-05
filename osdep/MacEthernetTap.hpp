@@ -51,6 +51,7 @@ public:
 	virtual bool addIp(const InetAddress &ip);
 	virtual bool removeIp(const InetAddress &ip);
 	virtual std::vector<InetAddress> ips() const;
+	virtual void scanIps();
 	virtual void put(const MAC &from,const MAC &to,unsigned int etherType,const void *data,unsigned int len);
 	virtual std::string deviceName() const;
 	virtual void setFriendlyName(const char *friendlyName);
@@ -77,6 +78,7 @@ private:
 	int _agentStdin,_agentStdout,_agentStderr,_agentStdin2,_agentStdout2,_agentStderr2;
 	long _agentPid;
 	volatile bool _enabled;
+	std::vector<InetAddress> _ips;
 };
 
 } // namespace ZeroTier

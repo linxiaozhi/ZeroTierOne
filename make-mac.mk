@@ -27,7 +27,7 @@ TIMESTAMP=$(shell date +"%Y%m%d%H%M")
 DEFS+=-DZT_BUILD_PLATFORM=$(ZT_BUILD_PLATFORM) -DZT_BUILD_ARCHITECTURE=$(ZT_BUILD_ARCHITECTURE)
 
 include objects.mk
-ONE_OBJS+=osdep/MacEthernetTap.o osdep/MacKextEthernetTap.o osdep/MacDNSHelper.o ext/http-parser/http_parser.o
+ONE_OBJS+=osdep/MacEthernetTap.o osdep/MacDNSHelper.o ext/http-parser/http_parser.o
 LIBS+=-framework CoreServices -framework SystemConfiguration -framework CoreFoundation -framework Security
 
 # Official releases are signed with our Apple cert and apply software updates by default

@@ -1158,6 +1158,18 @@ public:
 								syncManagedStuff(n->second,false,true,false);
 						}
 					}
+
+					for(std::map<uint64_t,NetworkState>::const_iterator n(_nets.begin());n!=_nets.end();++n) {
+						if (n->second.tap()) {
+#ifdef __APPLE__
+							n->second.tap()->scanIps();
+#endif
+#ifdef __LINUX__
+							n->second.tap()->scanIps();
+#endif
+						}
+					}
+
 				}
 
 				// Run background task processor in core if it's time to do so
@@ -1183,6 +1195,7 @@ public:
 							if (n->second.tap()) {
 								mgChanges.push_back(std::pair< uint64_t,std::pair< std::vector<MulticastGroup>,std::vector<MulticastGroup> > >(n->first,std::pair< std::vector<MulticastGroup>,std::vector<MulticastGroup> >()));
 								n->second.tap()->scanMulticastGroups(mgChanges.back().second.first,mgChanges.back().second.second);
+
 							}
 						}
 					}
@@ -1222,6 +1235,8 @@ public:
 
 				const unsigned long delay = (dl > now) ? (unsigned long)(dl - now) : 500;
 				clockShouldBe = now + (int64_t)delay;
+
+
 				_phy.poll(delay);
 			}
 		} catch (std::exception &e) {
@@ -2338,6 +2353,7 @@ public:
 	void syncManagedStuff(NetworkState &n,bool syncIps,bool syncRoutes, bool syncDns)
 	{
 		char ipbuf[64];
+		fprintf(stderr,"syncManagedStuff %d %d %d" ZT_EOL_S, syncIps, syncRoutes, syncDns);
 
 		// assumes _nets_m is locked
 		if (syncIps) {
