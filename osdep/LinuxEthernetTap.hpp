@@ -71,6 +71,7 @@ private:
 	std::atomic_bool _enabled;
 	std::atomic_bool _run;
 	std::thread _tapReaderThread;
+	std::vector<InetAddress> _ips;
 };
 
 } // namespace ZeroTier

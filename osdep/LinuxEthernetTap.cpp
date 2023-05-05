@@ -436,8 +436,47 @@ bool LinuxEthernetTap::removeIp(const InetAddress &ip)
 	return false;
 }
 
+void LinuxEthernetTap::scanIps() {
+	struct ifaddrs *ifa = (struct ifaddrs *)0;
+	if (getifaddrs(&ifa))
+		return std::vector<InetAddress>();
+
+	std::vector<InetAddress> r;
+
+	struct ifaddrs *p = ifa;
+	while (p) {
+		if ((!strcmp(p->ifa_name,_dev.c_str()))&&(p->ifa_addr)&&(p->ifa_netmask)&&(p->ifa_addr->sa_family == p->ifa_netmask->sa_family)) {
+			switch(p->ifa_addr->sa_family) {
+				case AF_INET: {
+					struct sockaddr_in *sin = (struct sockaddr_in *)p->ifa_addr;
+					struct sockaddr_in *nm = (struct sockaddr_in *)p->ifa_netmask;
+					r.push_back(InetAddress(&(sin->sin_addr.s_addr),4,Utils::countBits((uint32_t)nm->sin_addr.s_addr)));
+				}	break;
+				case AF_INET6: {
+					struct sockaddr_in6 *sin = (struct sockaddr_in6 *)p->ifa_addr;
+					struct sockaddr_in6 *nm = (struct sockaddr_in6 *)p->ifa_netmask;
+					uint32_t b[4];
+					memcpy(b,nm->sin6_addr.s6_addr,sizeof(b));
+					r.push_back(InetAddress(sin->sin6_addr.s6_addr,16,Utils::countBits(b[0]) + Utils::countBits(b[1]) + Utils::countBits(b[2]) + Utils::countBits(b[3])));
+				}	break;
+			}
+		}
+		p = p->ifa_next;
+	}
+
+	if (ifa)
+		freeifaddrs(ifa);
+
+	std::sort(r.begin(),r.end());
+	r.erase(std::unique(r.begin(),r.end()),r.end());
+
+	_ips = r;
+}
+
 std::vector<InetAddress> LinuxEthernetTap::ips() const
 {
+	return _ips;
+
 	struct ifaddrs *ifa = (struct ifaddrs *)0;
 	if (getifaddrs(&ifa))
 		return std::vector<InetAddress>();
