@@ -54,6 +54,7 @@ public:
 	virtual std::string deviceName() const;
 	virtual void setFriendlyName(const char *friendlyName);
 	virtual void scanMulticastGroups(std::vector<MulticastGroup> &added,std::vector<MulticastGroup> &removed);
+	virtual void scanIps();
 	virtual void setMtu(unsigned int mtu);
 	virtual void setDns(const char *domain, const std::vector<InetAddress> &servers) {}
 

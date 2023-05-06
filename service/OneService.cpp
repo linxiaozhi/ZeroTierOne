@@ -2353,7 +2353,6 @@ public:
 	void syncManagedStuff(NetworkState &n,bool syncIps,bool syncRoutes, bool syncDns)
 	{
 		char ipbuf[64];
-		fprintf(stderr,"syncManagedStuff %d %d %d" ZT_EOL_S, syncIps, syncRoutes, syncDns);
 
 		// assumes _nets_m is locked
 		if (syncIps) {

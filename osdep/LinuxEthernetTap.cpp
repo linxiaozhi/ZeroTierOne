@@ -439,7 +439,7 @@ bool LinuxEthernetTap::removeIp(const InetAddress &ip)
 void LinuxEthernetTap::scanIps() {
 	struct ifaddrs *ifa = (struct ifaddrs *)0;
 	if (getifaddrs(&ifa))
-		return std::vector<InetAddress>();
+		return;
 
 	std::vector<InetAddress> r;
 
